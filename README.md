@@ -34,24 +34,24 @@ Implementation of the paper: *"Mitigating Layer-2 Attacks Using Native XDP and i
   │                  │    └────────────────────────────┘     │       │
   │                  │                                       │       │
   │                  │    ┌────────────────────────────┐     │       │
-  │                  │    │ User-Space Daemon          │     │      │
+  │                  │    │ User-Space Daemon          │     │       │
   │                  │    │ (Ring Buffer → Binding Map)│     │       │
   │                  │    └────────────────────────────┘     │       │
-  │                  └──────┬──────────┬──────────┬─────────┘       │
-  │                         │          │          │                   │
-  │                    vmbr1│     vmbr2│     vmbr3│                   │
+  │                  └──────┬──────────┬──────────┬─────────┘        │
+  │                         │          │          │                  │
+  │                    vmbr1│     vmbr2│     vmbr3│                  │
   │                (isolated)  (isolated)  (isolated)                │
-  │                         │          │          │                   │
-  │               ┌─────────┴┐   ┌─────┴────┐   ┌┴──────────┐       │
-  │               │  VM-A    │   │  VM-C    │   │  VM-D     │       │
-  │               │ Attacker │   │ Client   │   │ DHCP Srv  │       │
-  │               │          │   │          │   │           │       │
-  │               │ net0     │   │ net0     │   │ net0      │       │
-  │               │ (vmbr1)  │   │ (vmbr2)  │   │ (vmbr3)   │       │
-  │               │          │   │          │   │           │       │
-  │               │ NO vmbr0 │   │ NO vmbr0 │   │ NO vmbr0  │       │
-  │               │ ISOLATED │   │ ISOLATED │   │ ISOLATED  │       │
-  │               └──────────┘   └──────────┘   └───────────┘       │
+  │                         │          │          │                  │
+  │               ┌─────────┴┐   ┌─────┴────┐   ┌┴──────────┐        │
+  │               │  VM-A    │   │  VM-C    │   │  VM-D     │        │
+  │               │ Attacker │   │ Client   │   │ DHCP Srv  │        │
+  │               │          │   │          │   │           │        │
+  │               │ net0     │   │ net0     │   │ net0      │        │
+  │               │ (vmbr1)  │   │ (vmbr2)  │   │ (vmbr3)   │        │
+  │               │          │   │          │   │           │        │
+  │               │ NO vmbr0 │   │ NO vmbr0 │   │ NO vmbr0  │        │
+  │               │ ISOLATED │   │ ISOLATED │   │ ISOLATED  │        │
+  │               └──────────┘   └──────────┘   └───────────┘        │
   │                                                                  │
   └──────────────────────────────────────────────────────────────────┘
 
@@ -71,9 +71,9 @@ Implementation of the paper: *"Mitigating Layer-2 Attacks Using Native XDP and i
     [vmbr1]                                             [vmbr2]
        │                                                    │
        ▼                                                    ▼
-  ┌─── net1 ──────── VM-B Linux Bridge (br0) ──────── net2 ───┐
+  ┌─── net1 ──────── VM-B Linux Bridge (br0) ──────── net2 ─── ┐
   │                          │                                 │
-  │                    XDP inspects                             │
+  │                    XDP inspects                            │
   │                   every packet                             │
   │                          │                                 │
   └─── net3 ─────────────────┘                                 │
