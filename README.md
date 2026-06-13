@@ -59,6 +59,82 @@ The physical host bridges multiple physical Ethernet interfaces (e.g., `eth1`, `
 # Debian / Ubuntu
 sudo apt-get update && sudo apt-get install -y clang llvm libelf-dev libbpf-dev bpfcc-tools linux-headers-$(uname -r) build-essential bridge-utils
 ```
+## Detection Workflow
+
+The framework processes packets at the XDP layer and applies a series of validation checks to detect and mitigate Layer-2 attacks before packets enter the Linux networking stack.
+
+### Workflow Diagram
+
+![XDP Security Flowchart](docs/flowchart.png)
+
+### 1. MAC Flood Detection
+
+The XDP program tracks unique source MAC addresses observed on the network. If the number of unique MAC addresses exceeds a predefined threshold, the packet is classified as part of a MAC flooding attack and is immediately dropped.
+
+**Action:** `DROP (MAC Flood)`
+
+---
+
+### 2. DHCP Snooping
+
+DHCP packets are mirrored to the user-space daemon through a ring buffer. The daemon extracts legitimate IP-MAC assignments and updates the eBPF binding table.
+
+This dynamically learned binding information is later used to validate ARP traffic.
+
+**Action:** `PASS + Learn Binding`
+
+---
+
+### 3. ARP Validation
+
+For ARP packets, the sender IP address is looked up in the IP-MAC binding table maintained in eBPF maps.
+
+- If the binding exists and the MAC address matches the stored entry, the packet is considered legitimate.
+- If the MAC address differs from the stored binding, the packet is identified as an ARP spoofing attempt.
+
+**Actions:**
+- Valid Binding → `PASS`
+- Binding Mismatch → `DROP (ARP Spoofing)`
+
+---
+
+### 4. Gratuitous ARP Handling
+
+If an ARP packet does not correspond to a known binding, the framework checks whether it is a Gratuitous ARP advertisement.
+
+In strict enforcement mode, unsolicited Gratuitous ARP packets are rejected to prevent unauthorized updates to IP-MAC mappings.
+
+**Action:** `DROP (Strict Mode)`
+
+---
+
+### 5. Flood Prevention
+
+For previously unseen hosts, the framework allows a limited number of ARP packets during the initial learning phase.
+
+A rate limiter is applied to prevent attackers from generating excessive ARP traffic.
+
+- Packets within the configured limit are accepted.
+- Packets exceeding the limit are classified as ARP flooding attempts.
+
+**Actions:**
+- Within Rate Limit → `PASS (Early Connection)`
+- Rate Limit Exceeded → `DROP (Flood)`
+
+---
+
+### Decision Summary
+
+| Condition | Action |
+|------------|----------|
+| Unique MAC count exceeds threshold | DROP (MAC Flood) |
+| DHCP packet | PASS + Mirror to User Space |
+| Non-ARP traffic | PASS |
+| Valid IP-MAC binding | PASS |
+| Binding mismatch | DROP (ARP Spoofing) |
+| Gratuitous ARP in strict mode | DROP |
+| Unknown ARP within rate limit | PASS |
+| Unknown ARP exceeding rate limit | DROP (Flood) |
 
 ## Build
 
