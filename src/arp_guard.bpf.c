@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * xdp_l2_security.bpf.c — Unified XDP-Based Layer-2 Security Enforcement
+ * arp_guard.bpf.c — Unified XDP-Based Layer-2 Security Enforcement
  *
  * Implements Algorithm 6 from the paper:
  *   "Mitigating Layer-2 Attacks Using Native XDP and its Performance Implications"
@@ -18,7 +18,7 @@
 #define HAVE_VMLINUX_H 1
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_endian.h>
-#include "xdp_l2_security.h"
+#include "arp_guard.h"
 
 #define ETH_P_ARP  0x0806
 #define ETH_P_IP   0x0800
@@ -141,7 +141,7 @@ static __always_inline int is_zero_mac(const unsigned char *mac)
 
 // Main XDP Entry Point — Unified Layer-2 Security Enforcement
 SEC("xdp")
-int xdp_l2_security(struct xdp_md *ctx)
+int arp_guard(struct xdp_md *ctx)
 {
     void *data     = (void *)(long)ctx->data;
     void *data_end = (void *)(long)ctx->data_end;

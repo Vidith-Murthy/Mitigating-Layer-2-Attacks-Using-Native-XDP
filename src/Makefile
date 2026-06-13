@@ -30,11 +30,11 @@ SRC_DIR     := .
 INSTALL_DIR := /usr/local/bin
 
 # ── Source files ─────────────────────────────────────────────────────────
-BPF_SRC     := $(SRC_DIR)/xdp_l2_security.bpf.c
-BPF_OBJ     := $(OUTPUT)/xdp_l2_security.bpf.o
-BPF_SKEL    := $(OUTPUT)/xdp_l2_security.skel.h
-DAEMON_SRC  := $(SRC_DIR)/l2_security_daemon.c
-DAEMON_BIN  := $(OUTPUT)/l2_security_daemon
+BPF_SRC     := $(SRC_DIR)/arp_guard.bpf.c
+BPF_OBJ     := $(OUTPUT)/arp_guard.bpf.o
+BPF_SKEL    := $(OUTPUT)/arp_guard.skel.h
+DAEMON_SRC  := $(SRC_DIR)/arp_guardd.c
+DAEMON_BIN  := $(OUTPUT)/arp_guard
 VMLINUX_H   := $(SRC_DIR)/vmlinux.h
 
 # ── Compiler flags ───────────────────────────────────────────────────────
@@ -64,7 +64,7 @@ $(VMLINUX_H):
 	$(BPFTOOL) btf dump file /sys/kernel/btf/vmlinux format c > $@
 
 # Compile BPF program
-$(BPF_OBJ): $(BPF_SRC) $(SRC_DIR)/xdp_l2_security.h $(VMLINUX_H) | $(OUTPUT)
+$(BPF_OBJ): $(BPF_SRC) $(SRC_DIR)/arp_guard.h $(VMLINUX_H) | $(OUTPUT)
 	@echo "  BPF      $@"
 	$(CLANG) $(BPF_CFLAGS) -c $< -o $@
 
@@ -74,7 +74,7 @@ $(BPF_SKEL): $(BPF_OBJ) | $(OUTPUT)
 	$(BPFTOOL) gen skeleton $< > $@
 
 # Compile user-space daemon
-$(DAEMON_BIN): $(DAEMON_SRC) $(BPF_SKEL) $(SRC_DIR)/xdp_l2_security.h | $(OUTPUT)
+$(DAEMON_BIN): $(DAEMON_SRC) $(BPF_SKEL) $(SRC_DIR)/arp_guard.h | $(OUTPUT)
 	@echo "  CC       $@"
 	$(CC) $(CFLAGS) -I$(OUTPUT) $< -o $@ $(LDFLAGS)
 
@@ -89,12 +89,12 @@ clean:
 	rm -f $(VMLINUX_H)
 
 install: $(DAEMON_BIN)
-	@echo "  INSTALL  $(INSTALL_DIR)/l2_security_daemon"
-	install -m 0755 $(DAEMON_BIN) $(INSTALL_DIR)/l2_security_daemon
+	@echo "  INSTALL  $(INSTALL_DIR)/arp_guard"
+	install -m 0755 $(DAEMON_BIN) $(INSTALL_DIR)/arp_guard
 
 uninstall:
-	@echo "  REMOVE   $(INSTALL_DIR)/l2_security_daemon"
-	rm -f $(INSTALL_DIR)/l2_security_daemon
+	@echo "  REMOVE   $(INSTALL_DIR)/arp_guard"
+	rm -f $(INSTALL_DIR)/arp_guard
 
 # ── Help ─────────────────────────────────────────────────────────────────
 .PHONY: help

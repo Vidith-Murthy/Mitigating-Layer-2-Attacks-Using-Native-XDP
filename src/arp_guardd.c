@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * l2_security_daemon.c — User-Space Control Plane for XDP Layer-2 Security
+ * arp_guardd.c — User-Space Control Plane for XDP Layer-2 Security
  *
  * This daemon:
  *   1. Loads and attaches the XDP program to specified network interfaces
@@ -10,7 +10,7 @@
  *   5. Provides CLI for listing bindings, stats, and manual management
  *
  * Usage:
- *   ./l2_security_daemon --iface <if1> [--iface <if2> ...] [options]
+ *   ./arp_guardd --iface <if1> [--iface <if2> ...] [options]
  *
  * Options:
  *   --iface <name>          Network interface to attach XDP (repeatable)
@@ -38,8 +38,8 @@
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
 
-#include "xdp_l2_security.h"
-#include "xdp_l2_security.skel.h"   
+#include "arp_guard.h"
+#include "arp_guard.skel.h"   
 
 static volatile int running = 1;
 static int verbose = 0;
@@ -235,8 +235,8 @@ static int handle_dhcp_event(void *ctx, void *data, size_t data_sz)
 static void list_bindings(int map_fd)
 {
     printf("\n╔══════════════════════════════════════════════════╗\n");
-    printf("║          Current IP → MAC Bindings              ║\n");
-    printf("╠══════════════════════════════════════════════════╣\n");
+    printf(  "║          Current IP → MAC Bindings               ║\n");
+    printf(  "╠══════════════════════════════════════════════════╣\n");
 
     __be32 key = 0, next_key;
     struct mac_addr value;
@@ -265,8 +265,8 @@ static void list_bindings(int map_fd)
 static void show_stats(int map_fd)
 {
     printf("\n╔══════════════════════════════════════════════════╗\n");
-    printf("║           XDP Layer-2 Security Statistics        ║\n");
-    printf("╠══════════════════════════════════════════════════╣\n");
+    printf(  "║           XDP Layer-2 Security Statistics        ║\n");
+    printf(  "╠══════════════════════════════════════════════════╣\n");
 
     /* stats_map is PERCPU, so we sum across CPUs */
     int nr_cpus = libbpf_num_possible_cpus();
@@ -320,6 +320,7 @@ int main(int argc, char **argv)
     const char *static_macs[MAX_STATIC_BINDINGS];
     int n_static = 0;
     int i;
+    struct ring_buffer *rb = NULL;
 
     
     for (i = 1; i < argc; i++) {
@@ -350,7 +351,7 @@ int main(int argc, char **argv)
     }
 
    
-    struct xdp_l2_security_bpf *skel = xdp_l2_security_bpf__open();
+    struct arp_guard_bpf *skel = arp_guard_bpf__open();
     if (!skel) {
         fprintf(stderr, "ERROR: Failed to open BPF skeleton: %s\n",
                 strerror(errno));
@@ -358,11 +359,11 @@ int main(int argc, char **argv)
     }
 
     /* Load BPF programs and maps */
-    int err = xdp_l2_security_bpf__load(skel);
+    int err = arp_guard_bpf__load(skel);
     if (err) {
         fprintf(stderr, "ERROR: Failed to load BPF program: %s\n",
                 strerror(-err));
-        xdp_l2_security_bpf__destroy(skel);
+        arp_guard_bpf__destroy(skel);
         return 1;
     }
 
@@ -373,13 +374,13 @@ int main(int argc, char **argv)
     //  Handle one-shot CLI commands 
     if (mode_list) {
         list_bindings(binding_map_fd);
-        xdp_l2_security_bpf__destroy(skel);
+        arp_guard_bpf__destroy(skel);
         return 0;
     }
 
     if (mode_stats) {
         show_stats(stats_map_fd);
-        xdp_l2_security_bpf__destroy(skel);
+        arp_guard_bpf__destroy(skel);
         return 0;
     }
 
@@ -387,13 +388,13 @@ int main(int argc, char **argv)
         struct in_addr addr;
         if (inet_pton(AF_INET, add_ip, &addr) != 1) {
             fprintf(stderr, "Invalid IP address: %s\n", add_ip);
-            xdp_l2_security_bpf__destroy(skel);
+            arp_guard_bpf__destroy(skel);
             return 1;
         }
         struct mac_addr mac;
         if (parse_mac(add_mac, mac.addr) != 0) {
             fprintf(stderr, "Invalid MAC address: %s\n", add_mac);
-            xdp_l2_security_bpf__destroy(skel);
+            arp_guard_bpf__destroy(skel);
             return 1;
         }
         err = bpf_map_update_elem(binding_map_fd, &addr.s_addr, &mac, BPF_ANY);
@@ -402,7 +403,7 @@ int main(int argc, char **argv)
         } else {
             printf("Binding added: %s → %s\n", add_ip, add_mac);
         }
-        xdp_l2_security_bpf__destroy(skel);
+        arp_guard_bpf__destroy(skel);
         return err ? 1 : 0;
     }
 
@@ -410,7 +411,7 @@ int main(int argc, char **argv)
         struct in_addr addr;
         if (inet_pton(AF_INET, del_ip, &addr) != 1) {
             fprintf(stderr, "Invalid IP address: %s\n", del_ip);
-            xdp_l2_security_bpf__destroy(skel);
+            arp_guard_bpf__destroy(skel);
             return 1;
         }
         err = bpf_map_delete_elem(binding_map_fd, &addr.s_addr);
@@ -419,7 +420,7 @@ int main(int argc, char **argv)
         } else {
             printf("Binding removed: %s\n", del_ip);
         }
-        xdp_l2_security_bpf__destroy(skel);
+        arp_guard_bpf__destroy(skel);
         return err ? 1 : 0;
     }
 
@@ -448,12 +449,12 @@ int main(int argc, char **argv)
     if (n_ifaces == 0) {
         fprintf(stderr, "ERROR: No interfaces specified. Use --iface <name>\n");
         usage(argv[0]);
-        xdp_l2_security_bpf__destroy(skel);
+        arp_guard_bpf__destroy(skel);
         return 1;
     }
 
     /* Attach XDP program to each interface */
-    int prog_fd = bpf_program__fd(skel->progs.xdp_l2_security);
+    int prog_fd = bpf_program__fd(skel->progs.arp_guard);
 
     for (i = 0; i < n_ifaces; i++) {
         unsigned int ifindex = if_nametoindex(ifaces[i]);
@@ -482,7 +483,7 @@ int main(int argc, char **argv)
     }
 
     // Set up ring buffer polling
-    struct ring_buffer *rb = ring_buffer__new(
+    rb = ring_buffer__new(
         bpf_map__fd(skel->maps.events_rb), handle_dhcp_event, NULL, NULL);
     if (!rb) {
         fprintf(stderr, "ERROR: Failed to create ring buffer: %s\n",
@@ -497,9 +498,9 @@ int main(int argc, char **argv)
     // Main event loop
     printf("\n");
     printf("╔══════════════════════════════════════════════════════╗\n");
-    printf("║   XDP Layer-2 Security Daemon — Active              ║\n");
-    printf("║   Monitoring DHCP traffic for binding updates...    ║\n");
-    printf("║   Press Ctrl+C to stop                              ║\n");
+    printf("║   XDP Layer-2 Security Daemon — Active               ║\n");
+    printf("║   Monitoring DHCP traffic for binding updates...     ║\n");
+    printf("║   Press Ctrl+C to stop                               ║\n");
     printf("╠══════════════════════════════════════════════════════╣\n");
     printf("║   Interfaces: ");
     for (i = 0; i < n_ifaces; i++)
@@ -535,7 +536,7 @@ cleanup:
 
     if (rb)
         ring_buffer__free(rb);
-    xdp_l2_security_bpf__destroy(skel);
+    arp_guard_bpf__destroy(skel);
 
     printf("Done.\n");
     return 0;

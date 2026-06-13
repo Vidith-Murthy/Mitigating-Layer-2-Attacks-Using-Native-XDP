@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0
  *
- * xdp_l2_security.h — Shared definitions for XDP Layer-2 Security System
+ * arp_guard.h — Shared definitions for XDP Layer-2 Security System
  *
  * Implements the data structures and constants described in:
  *   "Mitigating Layer-2 Attacks Using Native XDP and its Performance Implications"
@@ -9,8 +9,8 @@
  * user-space control plane daemon.
  */
 
-#ifndef XDP_L2_SECURITY_H
-#define XDP_L2_SECURITY_H
+#ifndef ARP_GUARD_H
+#define ARP_GUARD_H
 
 /* ── Tuneable Thresholds ─────────────────────────────────────────────────
  *
@@ -119,4 +119,4 @@ struct dhcp_packet {
     unsigned int   magic;      
 } __attribute__((packed));
 
-#endif /* XDP_L2_SECURITY_H */
+#endif /* ARP_GUARD_H */
