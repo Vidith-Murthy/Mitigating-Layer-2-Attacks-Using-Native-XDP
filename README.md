@@ -232,6 +232,8 @@ build/
 ├── arp_guard                   User-space control daemon executable
 ├── arp_guard.bpf.o             Compiled XDP/eBPF program object
 ├── arp_guard.skel.h            Generated libbpf skeleton header
+docs/
+├── flowchart.png               Layer-2 security enforcement workflow diagram
 scripts/
 ├── benchmark_attack.sh         Simulate attacks and measure performance
 ├── setup_bridge.sh             Configure Linux host as an L2 bridge
