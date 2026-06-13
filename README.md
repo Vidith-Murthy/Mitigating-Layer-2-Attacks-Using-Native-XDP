@@ -2,6 +2,7 @@
 
 **Mitigating ARP Spoofing and MAC Flooding Using Native XDP**
 
+Implementation of the paper: *"Mitigating Layer-2 Attacks Using Native XDP and its Performance Implications"*
 
 ---
 
@@ -33,24 +34,24 @@
   │                  │    └────────────────────────────┘     │       │
   │                  │                                       │       │
   │                  │    ┌────────────────────────────┐     │       │
-  │                  │    │ User-Space Daemon          │     │       │
+  │                  │    │ User-Space Daemon          │     │      │
   │                  │    │ (Ring Buffer → Binding Map)│     │       │
   │                  │    └────────────────────────────┘     │       │
-  │                  └──────┬──────────┬──────────┬───────── ┘       │
-  │                         │          │          │                  │
-  │                    vmbr1│     vmbr2│     vmbr3│                  │
+  │                  └──────┬──────────┬──────────┬─────────┘       │
+  │                         │          │          │                   │
+  │                    vmbr1│     vmbr2│     vmbr3│                   │
   │                (isolated)  (isolated)  (isolated)                │
-  │                         │          │          │                  │
-  │               ┌─────────┴┐   ┌─────┴────┐   ┌┴──────────┐        │
-  │               │  VM-A    │   │  VM-C    │   │  VM-D     │        │
-  │               │ Attacker │   │ Client   │   │ DHCP Srv  │        │
-  │               │          │   │          │   │           │        │
-  │               │ net0     │   │ net0     │   │ net0      │        │
-  │               │ (vmbr1)  │   │ (vmbr2)  │   │ (vmbr3)   │        │
-  │               │          │   │          │   │           │        │
-  │               │ NO vmbr0 │   │ NO vmbr0 │   │ NO vmbr0  │        │
-  │               │ ISOLATED │   │ ISOLATED │   │ ISOLATED  │        │
-  │               └──────────┘   └──────────┘   └───────────┘        │
+  │                         │          │          │                   │
+  │               ┌─────────┴┐   ┌─────┴────┐   ┌┴──────────┐       │
+  │               │  VM-A    │   │  VM-C    │   │  VM-D     │       │
+  │               │ Attacker │   │ Client   │   │ DHCP Srv  │       │
+  │               │          │   │          │   │           │       │
+  │               │ net0     │   │ net0     │   │ net0      │       │
+  │               │ (vmbr1)  │   │ (vmbr2)  │   │ (vmbr3)   │       │
+  │               │          │   │          │   │           │       │
+  │               │ NO vmbr0 │   │ NO vmbr0 │   │ NO vmbr0  │       │
+  │               │ ISOLATED │   │ ISOLATED │   │ ISOLATED  │       │
+  │               └──────────┘   └──────────┘   └───────────┘       │
   │                                                                  │
   └──────────────────────────────────────────────────────────────────┘
 
@@ -70,9 +71,9 @@
     [vmbr1]                                             [vmbr2]
        │                                                    │
        ▼                                                    ▼
-  ┌─── net1 ──────── VM-B Linux Bridge (br0) ──────── net2 ─── ┐
+  ┌─── net1 ──────── VM-B Linux Bridge (br0) ──────── net2 ───┐
   │                          │                                 │
-  │                    XDP inspects                            │
+  │                    XDP inspects                             │
   │                   every packet                             │
   │                          │                                 │
   └─── net3 ─────────────────┘                                 │
@@ -425,6 +426,80 @@ sudo ./build/l2_security_daemon --stats
 | `stats_map` | PERCPU_ARRAY | Stat index | Counter | Performance counters |
 | `events_rb` | RINGBUF | — | Packet data | DHCP packet mirroring |
 
+## Algorithm Reference
+
+| Algorithm | Paper Section | File | Function |
+|-----------|--------------|------|----------|
+| Algorithm 1 — DHCP Binding Update | §3.2 | `l2_security_daemon.c` | `handle_dhcp_event()` |
+| Algorithm 2 — ARP Validation | §3.3 | `xdp_l2_security.bpf.c` | Phase 3 |
+| Algorithm 3 — Gratuitous ARP Handling | §3.3 | `xdp_l2_security.bpf.c` | Phase 3 (GARP check) |
+| Algorithm 4 — Rate Limiting | §3.4 | `xdp_l2_security.bpf.c` | Phase 3 (rate limit) |
+| Algorithm 5 — MAC Tracking | §3.5 | `xdp_l2_security.bpf.c` | Phase 1 |
+| Algorithm 6 — Unified Enforcement | §3.6 | `xdp_l2_security.bpf.c` | `xdp_l2_security()` |
+
+---
+
+## Troubleshooting
+
+### XDP attach fails
+```bash
+# Check if interface supports XDP
+ethtool -i eth0 | grep driver
+# virtio_net = native XDP support (Proxmox VirtIO)
+# e1000 / rtl8139 = NO XDP support (change NIC model in Proxmox to VirtIO)
+
+# Check for existing XDP programs
+ip link show eth0 | grep xdp
+
+# Force detach
+ip link set dev eth0 xdp off
+```
+
+### No bindings appearing
+```bash
+# Verify DHCP traffic reaches VM-B
+tcpdump -i ens19 port 67 or port 68 -vv
+
+# Check ring buffer
+bpftool map dump name events_rb
+
+# Verify daemon is running
+ps aux | grep l2_security_daemon
+```
+
+### VM-A/C/D can't communicate
+```bash
+# On VM-B, verify the bridge is up
+brctl show br0
+
+# Verify all interfaces are in the bridge
+bridge link
+
+# Check that XDP is attached
+ip link show ens19 | grep xdp
+ip link show ens20 | grep xdp
+ip link show ens21 | grep xdp
+```
+
+### Accessing isolated VMs (VM-A, VM-C, VM-D)
+Since these VMs have no internet and no management network:
+- Use **Proxmox noVNC console** (Datacenter → VM → Console)
+- Or copy files via VM-B after the bridge is up:
+  ```bash
+  # From VM-B, once bridge is up and VMs have IPs:
+  scp *.sh user@192.168.100.100:~/   # to VM-C
+  scp *.sh user@192.168.100.101:~/   # to VM-A
+  ```
+
+### Program verification fails
+```bash
+# Check BPF verifier log
+bpftool prog load xdp_l2_security.bpf.o /sys/fs/bpf/test type xdp
+
+# The default 1M instruction limit should be sufficient
+```
+
+---
 
 ## Teardown
 

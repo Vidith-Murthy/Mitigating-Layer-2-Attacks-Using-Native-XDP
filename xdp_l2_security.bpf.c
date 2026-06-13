@@ -20,7 +20,6 @@
 #include <bpf/bpf_endian.h>
 #include "xdp_l2_security.h"
 
-/* ── Ethernet & ARP constants ────────────────────────────────────────── */
 #define ETH_P_ARP  0x0806
 #define ETH_P_IP   0x0800
 #define ETH_ALEN   6
@@ -30,7 +29,7 @@
 #define ARP_OP_REQUEST 1
 #define ARP_OP_REPLY   2
 
-/* ── ARP Header (for IPv4 over Ethernet) ─────────────────────────────── */
+
 struct arp_hdr {
     __be16 ar_hrd;        /* Hardware type */
     __be16 ar_pro;        /* Protocol type */
@@ -83,7 +82,7 @@ struct {
 
 /*
  * rate_limit_map — Per-IP packet counter for rate-limiting unknown
- * ARP sources (Algorithm 4).  LRU eviction keeps memory bounded.
+ * ARP sources.  LRU eviction keeps memory bounded.
  */
 struct {
     __uint(type, BPF_MAP_TYPE_LRU_HASH);
@@ -111,7 +110,7 @@ struct {
     __uint(max_entries, RINGBUF_SIZE);
 } events_rb SEC(".maps");
 
-/* ── Helper: Increment a stats counter ───────────────────────────────── */
+// Increment a stats counter 
 static __always_inline void stats_inc(__u32 idx)
 {
     __u64 *val = bpf_map_lookup_elem(&stats_map, &idx);
@@ -119,7 +118,7 @@ static __always_inline void stats_inc(__u32 idx)
         __sync_fetch_and_add(val, 1);
 }
 
-/* ── Helper: Compare two MAC addresses ───────────────────────────────── */
+// Compare two MAC addresses
 static __always_inline int mac_equal(const unsigned char *a,
                                      const unsigned char *b)
 {
@@ -127,24 +126,20 @@ static __always_inline int mac_equal(const unsigned char *a,
            (a[3] == b[3]) && (a[4] == b[4]) && (a[5] == b[5]);
 }
 
-/* ── Helper: Check if MAC is broadcast (ff:ff:ff:ff:ff:ff) ───────────── */
+// Check if MAC is broadcast (ff:ff:ff:ff:ff:ff)
 static __always_inline int is_broadcast_mac(const unsigned char *mac)
 {
     return (mac[0] & mac[1] & mac[2] & mac[3] & mac[4] & mac[5]) == 0xff;
 }
 
-/* ── Helper: Check if MAC is zero (00:00:00:00:00:00) ────────────────── */
+// Check if MAC is zero (00:00:00:00:00:00)
 static __always_inline int is_zero_mac(const unsigned char *mac)
 {
     return (mac[0] | mac[1] | mac[2] | mac[3] | mac[4] | mac[5]) == 0;
 }
 
-/*
- * ══════════════════════════════════════════════════════════════════════
- *  Main XDP Entry Point — Unified Layer-2 Security Enforcement
- *  Implements Algorithm 6 from the paper.
- * ══════════════════════════════════════════════════════════════════════
- */
+
+// Main XDP Entry Point — Unified Layer-2 Security Enforcement
 SEC("xdp")
 int xdp_l2_security(struct xdp_md *ctx)
 {
@@ -153,7 +148,7 @@ int xdp_l2_security(struct xdp_md *ctx)
 
     stats_inc(STATS_TOTAL_PACKETS);
 
-    /* ── Parse Ethernet Header ───────────────────────────────────────── */
+    // Parse Ethernet Header
     struct ethhdr *eth = data;
     if ((void *)(eth + 1) > data_end)
         return XDP_PASS;
@@ -203,12 +198,11 @@ int xdp_l2_security(struct xdp_md *ctx)
         /* If MAC is already tracked, nothing to do for flood detection */
     }
 
-    /* ════════════════════════════════════════════════════════════════
-     *  PHASE 2 — Protocol Demultiplexing & Enforcement
-     * ════════════════════════════════════════════════════════════════ */
+    // PHASE 2 — Protocol Demultiplexing & Enforcement
+    
 
-    /* ── DHCP Handling (Algorithm 1) ─────────────────────────────────
-     * If the packet is an IPv4/UDP packet on ports 67 or 68,
+    
+     /* If the packet is an IPv4/UDP packet on ports 67 or 68,
      * mirror it to user-space via the ring buffer and PASS.
      */
     if (eth_type == ETH_P_IP) {
@@ -258,7 +252,7 @@ int xdp_l2_security(struct xdp_md *ctx)
         return XDP_PASS;
     }
 
-    /* ── ARP Handling (Algorithms 2, 3, 4) ───────────────────────────  */
+    // ARP Handling 
     if (eth_type == ETH_P_ARP) {
         struct arp_hdr *arph = (void *)(eth + 1);
         if ((void *)(arph + 1) > data_end)
@@ -278,11 +272,11 @@ int xdp_l2_security(struct xdp_md *ctx)
         __be32 ip_src    = arph->ar_sip;
         __be32 ip_target = arph->ar_tip;
 
-        /* ── Check binding_map for sender IP ─────────────────────────── */
+        // Check binding_map for sender IP 
         struct mac_addr *binding = bpf_map_lookup_elem(&binding_map, &ip_src);
 
         if (binding) {
-            /* Binding exists: strict MAC validation (Algorithm 2) */
+            /* Binding exists: strict MAC validation  */
             if (mac_equal(arph->ar_sha, binding->addr)) {
                 /* MAC matches trusted binding → PASS */
                 stats_inc(STATS_ARP_PASSED);
@@ -297,7 +291,7 @@ int xdp_l2_security(struct xdp_md *ctx)
 
         /* ── No binding exists — handle initial state / race condition ─ */
 
-        /* Algorithm 3: Gratuitous ARP (sender IP == target IP)
+        /*Gratuitous ARP (sender IP == target IP)
          * Without a trusted binding, GARP is strictly dropped
          * as it is the primary vector for MITM cache poisoning.
          */
@@ -306,7 +300,7 @@ int xdp_l2_security(struct xdp_md *ctx)
             return XDP_DROP;
         }
 
-        /* Algorithm 4: Rate-limited acceptance for unknown ARP
+        /* Rate-limited acceptance for unknown ARP
          * Allow a small threshold of packets for initial network
          * discovery (DHCP hasn't completed yet).
          */
@@ -327,7 +321,7 @@ int xdp_l2_security(struct xdp_md *ctx)
         return XDP_PASS;
     }
 
-    /* ── All other EtherTypes (IPv6, etc.) — PASS ────────────────────── */
+    // All other EtherTypes (IPv6, etc.) — PASS 
     stats_inc(STATS_PASSED);
     return XDP_PASS;
 }

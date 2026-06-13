@@ -20,8 +20,8 @@ RANGE_START="${3:-192.168.100.100}"
 RANGE_END="${4:-192.168.100.200}"
 SERVER_IP="${5:-192.168.100.1}"
 NETMASK="255.255.255.0"
-LEASE_TIME="600"          # 10 minutes
-MAX_LEASE_TIME="7200"     # 2 hours
+LEASE_TIME="600"          
+MAX_LEASE_TIME="7200"     
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -36,20 +36,20 @@ if [[ $EUID -ne 0 ]]; then
     err "This script must be run as root"
 fi
 
-# ── Assign static IP to DHCP server interface ───────────────────────
+# Assign static IP to DHCP server interface
 info "Configuring $IFACE with IP $SERVER_IP/24..."
 ip addr flush dev "$IFACE" 2>/dev/null || true
 ip addr add "$SERVER_IP/24" dev "$IFACE"
 ip link set "$IFACE" up
 ok "Interface $IFACE configured"
 
-# ── Install isc-dhcp-server ─────────────────────────────────────────
+
 info "Installing isc-dhcp-server..."
 apt-get update -qq
 apt-get install -y -qq isc-dhcp-server
 ok "isc-dhcp-server installed"
 
-# ── Configure dhcpd.conf ────────────────────────────────────────────
+# Configure dhcpd.conf
 info "Writing /etc/dhcp/dhcpd.conf..."
 cat > /etc/dhcp/dhcpd.conf <<EOF
 # ═══════════════════════════════════════════════════════════════
@@ -79,7 +79,7 @@ subnet ${SUBNET} netmask ${NETMASK} {
 EOF
 ok "dhcpd.conf written"
 
-# ── Configure the listening interface ───────────────────────────────
+# Configure the listening interface 
 info "Setting DHCP server to listen on $IFACE..."
 cat > /etc/default/isc-dhcp-server <<EOF
 INTERFACESv4="${IFACE}"
@@ -87,7 +87,7 @@ INTERFACESv6=""
 EOF
 ok "Listening interface set to $IFACE"
 
-# ── Restart DHCP server ─────────────────────────────────────────────
+# Restart DHCP server
 info "Starting isc-dhcp-server..."
 systemctl restart isc-dhcp-server
 systemctl enable isc-dhcp-server
@@ -98,7 +98,7 @@ else
     err "DHCP server failed to start. Check: journalctl -u isc-dhcp-server"
 fi
 
-# ── Summary ──────────────────────────────────────────────────────────
+
 echo ""
 echo "╔══════════════════════════════════════════════════════════════╗"
 echo "║              DHCP Server Configuration Complete             ║"
@@ -114,6 +114,6 @@ echo "║    sudo dhclient <interface>                                ║"
 echo "╚══════════════════════════════════════════════════════════════╝"
 echo ""
 
-# Show current leases
+
 echo "Current leases:"
 cat /var/lib/dhcp/dhcpd.leases 2>/dev/null || echo "(none yet)"

@@ -46,20 +46,20 @@
 /* Maximum entries in the rate-limit tracking map */
 #define MAX_RATE_ENTRIES 1024
 
-/* ── Statistics Counters (indices into stats_map) ────────────────────── */
+// Statistics Counters (indices into stats_map) 
 enum stats_index {
-    STATS_TOTAL_PACKETS = 0,     /* Total packets seen */
-    STATS_PASSED,                /* Packets forwarded (XDP_PASS) */
-    STATS_DROPPED_ARP_SPOOF,     /* ARP spoofing drops */
-    STATS_DROPPED_GARP,          /* Gratuitous ARP drops */
-    STATS_DROPPED_MAC_FLOOD,     /* MAC flooding drops */
-    STATS_DROPPED_RATE_LIMIT,    /* Rate-limited unknown ARP drops */
-    STATS_DHCP_MIRRORED,         /* DHCP packets mirrored to user-space */
-    STATS_ARP_PASSED,            /* ARP packets that passed validation */
-    STATS_MAX                    /* Sentinel – must be last */
+    STATS_TOTAL_PACKETS = 0,    
+    STATS_PASSED,               
+    STATS_DROPPED_ARP_SPOOF,     
+    STATS_DROPPED_GARP,          
+    STATS_DROPPED_MAC_FLOOD,     
+    STATS_DROPPED_RATE_LIMIT,   
+    STATS_DHCP_MIRRORED,         
+    STATS_ARP_PASSED,            
+    STATS_MAX                    
 };
 
-/* ── MAC Address Container ───────────────────────────────────────────── */
+// MAC Address Container 
 /*
  * vmlinux.h (included by BPF programs) already defines struct mac_addr.
  * Only define it here for user-space builds.
@@ -70,7 +70,7 @@ struct mac_addr {
 } __attribute__((packed));
 #endif
 
-/* ── Ring Buffer Event Structure (DHCP packet mirror) ────────────────── */
+// Ring Buffer Event Structure (DHCP packet mirror)
 #define MAX_DHCP_PACKET_SIZE 1500
 
 struct dhcp_event {
@@ -78,7 +78,7 @@ struct dhcp_event {
     unsigned char pkt_data[MAX_DHCP_PACKET_SIZE]; /* Full packet copy */
 };
 
-/* ── DHCP Protocol Constants ─────────────────────────────────────────── */
+// DHCP Protocol Constants 
 #define DHCP_SERVER_PORT 67
 #define DHCP_CLIENT_PORT 68
 
@@ -97,27 +97,26 @@ struct dhcp_event {
 #define DHCP_OPT_END        255
 #define DHCP_OPT_PAD          0
 
-/* DHCP magic cookie */
+
 #define DHCP_MAGIC_COOKIE 0x63825363
 
-/* ── DHCP Packet Layout ──────────────────────────────────────────────── */
+// DHCP Packet Layout
 struct dhcp_packet {
-    unsigned char  op;         /* Message op code: 1=BOOTREQUEST, 2=BOOTREPLY */
-    unsigned char  htype;      /* Hardware address type: 1=Ethernet */
-    unsigned char  hlen;       /* Hardware address length: 6 for Ethernet */
-    unsigned char  hops;       /* Hops */
-    unsigned int   xid;        /* Transaction ID */
-    unsigned short secs;       /* Seconds elapsed */
-    unsigned short flags;      /* Flags */
-    unsigned int   ciaddr;     /* Client IP address */
-    unsigned int   yiaddr;     /* 'Your' (client) IP address (assigned IP) */
-    unsigned int   siaddr;     /* Next server IP address */
-    unsigned int   giaddr;     /* Relay agent IP address */
-    unsigned char  chaddr[16]; /* Client hardware address (MAC in first 6) */
-    unsigned char  sname[64];  /* Server host name */
-    unsigned char  file[128];  /* Boot file name */
-    unsigned int   magic;      /* Magic cookie (0x63825363) */
-    /* Variable-length options follow */
+    unsigned char  op;         
+    unsigned char  htype;      
+    unsigned char  hlen;       
+    unsigned char  hops;       
+    unsigned int   xid;        
+    unsigned short secs;       
+    unsigned short flags;      
+    unsigned int   ciaddr;     
+    unsigned int   yiaddr;     
+    unsigned int   siaddr;     
+    unsigned int   giaddr;     
+    unsigned char  chaddr[16]; 
+    unsigned char  sname[64];  
+    unsigned char  file[128];  
+    unsigned int   magic;      
 } __attribute__((packed));
 
 #endif /* XDP_L2_SECURITY_H */

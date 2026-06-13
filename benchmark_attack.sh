@@ -6,11 +6,10 @@
 # to measure XDP's ability to handle both at scale.
 #
 # Run this on VM-A (Attacker). It generates attack traffic while
-# VM-C runs iperf3 against VM-D in parallel.
+# Victim runs iperf3 against VM-D in parallel.
 #
 # Usage:
 #   On VM-D:  iperf3 -s
-#   On VM-C:  iperf3 -c 192.168.100.1 -t 60 -f m
 #   On VM-A:  sudo ./benchmark_attack.sh <attack_type> <interface> <duration>
 #
 # Attack types: arp_spoof, mac_flood, garp, all
@@ -27,7 +26,7 @@ ATTACK="${1:?Usage: $0 <arp_spoof|mac_flood|garp|all> <interface> <duration_secs
 IFACE="${2:-eth0}"
 DURATION="${3:-30}"
 
-TARGET_IP="192.168.100.100"     # VM-C (victim)
+TARGET_IP="192.168.100.100"     #victim
 GATEWAY_IP="192.168.100.1"      # VM-D (DHCP server)
 
 RED='\033[0;31m'
@@ -62,7 +61,6 @@ echo ""
     echo ""
 } > "$RESULTS_FILE"
 
-# ── Check dependencies ──────────────────────────────────────────────
 check_deps() {
     for cmd in "$@"; do
         if ! command -v "$cmd" &>/dev/null; then
@@ -76,9 +74,6 @@ check_deps() {
     done
 }
 
-# ════════════════════════════════════════════════════════════════════
-# ARP Spoofing at Scale
-# ════════════════════════════════════════════════════════════════════
 run_arp_spoof() {
     info "Starting high-rate ARP spoof attack for ${DURATION}s..."
 
@@ -143,9 +138,6 @@ print(f'Sent {count} spoofed ARP packets in {elapsed}s ({pps:.0f} pps)')
     echo "" >> "$RESULTS_FILE"
 }
 
-# ════════════════════════════════════════════════════════════════════
-# MAC Flooding at Scale
-# ════════════════════════════════════════════════════════════════════
 run_mac_flood() {
     info "Starting high-rate MAC flood attack for ${DURATION}s..."
 
@@ -209,9 +201,6 @@ print(f'Sent {count} random-MAC packets in {elapsed}s ({pps:.0f} pps)')
     echo "" >> "$RESULTS_FILE"
 }
 
-# ════════════════════════════════════════════════════════════════════
-# Gratuitous ARP at Scale
-# ════════════════════════════════════════════════════════════════════
 run_garp() {
     info "Starting high-rate Gratuitous ARP attack for ${DURATION}s..."
 
@@ -257,9 +246,6 @@ print(f'Sent {count} gratuitous ARP packets in {elapsed}s ({pps:.0f} pps)')
     echo "" >> "$RESULTS_FILE"
 }
 
-# ════════════════════════════════════════════════════════════════════
-# Run selected attack
-# ════════════════════════════════════════════════════════════════════
 case "$ATTACK" in
     arp_spoof)
         run_arp_spoof
