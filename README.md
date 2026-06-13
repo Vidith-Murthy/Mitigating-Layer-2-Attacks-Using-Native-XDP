@@ -152,15 +152,19 @@ make FLOOD_THRESHOLD=200 RATE_LIMIT=10
 ## Repository Layout
 
 ```
+build/
+├── arp_guard                   User-space control daemon executable
+├── arp_guard.bpf.o             Compiled XDP/eBPF program object
+├── arp_guard.skel.h            Generated libbpf skeleton header
+scripts/
+├── benchmark_attack.sh         Simulate attacks and measure performance
+├── setup_bridge.sh             Configure Linux host as an L2 bridge
+├── setup_dhcp_server.sh        Configure DHCP server
 src/
 ├── arp_guard.h                 Shared header (maps, constants, structs)
 ├── arp_guard.bpf.c             XDP kernel program
 ├── arp_guardd.c                User-space daemon
 ├── Makefile                    Build system
-scripts/
-├── benchmark_attack.sh         Simulate attacks and measure performance
-├── setup_bridge.sh             Configure Linux host as an L2 bridge
-├── setup_dhcp_server.sh        Configure DHCP server
 ```
 
 ## eBPF Maps
